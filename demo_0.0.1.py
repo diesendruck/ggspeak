@@ -13,10 +13,12 @@ import unicodedata
 diamonds = diamonds[['carat', 'depth', 'table', 'price', 'x', 'y', 'z']]
 
 # Set up prompt.
-print('\n\n ----------- DEMO ------------ ')
-print('\n  Here are your available variables  ')
+print('\n\n  ----------- DEMO ------------ ')
+print('  Use speech recognition to graph.  ')
+print('  This demo uses a dataset on diamonds.  ')
+print('\n  Available variables:  ')
 print(' [' + ', '.join(list(diamonds.columns.values)) + ']')
-time.sleep(3)
+time.sleep(5)
 print('\n\n  What do you want to plot?  ')
 
 # Ask for command.
@@ -37,7 +39,13 @@ terms = said.split(' ')
 
 # Handle misunderstandings.
 carat_mis = ['carrot', 'karat', 'current', 'parrot']
+depth_mis = ['death']
+x_mis = ['ex']
+y_mis = ['why']
 terms = ['carat' if i in carat_mis else i for i in terms]
+terms = ['depth' if i in depth_mis else i for i in terms]
+terms = ['x' if i in x_mis else i for i in terms]
+terms = ['y' if i in y_mis else i for i in terms]
 
 # Extract variables.
 plot_framework = ['plot', 'versus', 'vs']
