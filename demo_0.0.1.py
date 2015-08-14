@@ -19,7 +19,7 @@ print('  This demo uses a dataset on diamonds.  ')
 print('\n  Available variables:  ')
 print(' [' + ', '.join(list(diamonds.columns.values)) + ']')
 time.sleep(5)
-print('\n\n  What do you want to plot?  ')
+print('\n\n  *** WHAT DO YOU WANT TO PLOT? ***  ')
 
 # Ask for command.
 r = sr.Recognizer()
