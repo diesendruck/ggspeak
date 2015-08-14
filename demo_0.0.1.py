@@ -38,7 +38,7 @@ said = said.lower()
 terms = said.split(' ')
 
 # Handle misunderstandings.
-carat_mis = ['carrot', 'karat', 'current', 'parrot']
+carat_mis = ['carrot', 'karat', 'current', 'parrot', 'ferret']
 depth_mis = ['death']
 price_mis = ['press']
 x_mis = ['ex']
