@@ -133,7 +133,8 @@ def update_graph(g, terms):
 	dataset = eval(g.dataset)
 	plot_framework = ['plot', 'versus', 'vs']
 	try:
-		x, y = [t for t in terms if t in dataset.columns.values]
+		matches = [t for t in terms if t in dataset.columns.values]
+		x, y = matches[-2:]
 	except:
 		print('Did not catch two variables.')
 		return None
