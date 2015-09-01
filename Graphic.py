@@ -33,6 +33,7 @@ class Graphic(object):
 		self.ylab = None
 		self.title = None
 		self.add_smooth = False
+		self.valid_graph = False
 
 	def make_gg_string(self):
 		"""Builds string to graph with ggplot package.
@@ -58,8 +59,12 @@ class Graphic(object):
 
 		Uses characteristics to make graph object.
 		"""
-		plot = eval(self.make_gg_string())
-		return plot
+		if self.valid_graph:
+			plot = eval(self.make_gg_string())
+			print ('Plotting...')
+			print plot
+		else:
+			print("Graph not valid. Try again.")
 
 
 

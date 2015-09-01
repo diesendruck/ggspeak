@@ -33,26 +33,26 @@ def main():
 
 	# Run speech recognition and graphing in a streaming format.
 	attentive = True
-	while attentive:	
+	while attentive:
 		with mic as source:	
 			audio = get_audio(r, source)
-			
 			try:
 				text = r.recognize(audio)
 				print('You said: ' + text)
+			except LookupError:
+				print("Didn't get audio.")
+				continue
+			if text:
 				terms = tokenize(text)
 				attentive = is_attentive(terms)
 				if not attentive:
 					print 'Goodbye'
 					return None
-				update_graph(g, terms)
-			except LookupError:
-				print 'could not understand audio'				
+				g = update_graph(g, terms)
+				g.make_gg_plot()
 
 def introduction():
-	print('\n\n----------- DEMO ------------')
-	print('Graph by voice.')
-	time.sleep(2)
+	print('\n\n----------- GGSPEAK: Graph by Voice ------------')
 
 def prepare_mic():
 	"""Instantiates recognizer and microphone objects.
@@ -70,32 +70,33 @@ def prepare_mic():
 	r = sr.Recognizer()
 	m = sr.Microphone()
 	with m as source:
-		r.adjust_for_ambient_noise(source)
+		r.adjust_for_ambient_noise(source, duration=2)
+		r.pause_threshold = 1.5
 	return r, m	
 
 def choose_dataset(g):
-	print 'First choose file.'
+	print 'Type file name.'
 	filename = os.getcwd()+'/'+raw_input('Filename: '+os.getcwd()+'/')
-	dataset = pd.read_csv(filename)
+	try:
+		dataset = pd.read_csv(filename)
+	except LookupError:
+		print("No document found.")
 
 	# Set dataset as the chosen file.
 	g.dataset = dataset
 	g.filename = filename
 
-	# Select only numerical columns.	
-	# Specific to diamonds.
 	names = '[' + ', '.join(list(g.dataset.columns.values)) + ']'
 	names = names.upper()
 	print('\nYou are using the dataset ' + g.filename)
 	print('Data preview:')
 	print(g.dataset.head(5))
 	print
-	time.sleep(3)
 
 	return g
 
 def get_audio(r, source):
-	print "Listening..."
+	print "\n Listening..."
 	audio = r.listen(source)
 	return audio
 
@@ -114,6 +115,31 @@ def is_attentive(terms):
 		attentive = False
 	return attentive
 
+def is_valid_plot(g):
+	if g.geom == None:
+		print("No geometry found.")
+	elif g.geom in ['point', 'line']:
+		if all([len(g.data_cols) == 2,
+		       g.dataset[g.data_cols[0]].dtype in ['float64', 'int64'],
+		       g.dataset[g.data_cols[1]].dtype in ['float64', 'int64']]): 
+			g.valid_graph = True
+	elif g.geom in ['histogram', 'bar']:
+		if len(g.data_cols) == 1:
+			g.valid_graph = True
+	summarize_graph(g)
+	return g
+
+def summarize_graph(g):
+	print(' - Summary - ')
+	print('Dataset: '+g.filename)
+	print('Geom: '+g.geom)
+	print('Datacols: '+str(g.data_cols))
+	if len(g.data_cols) >=1:
+		print('type data 0: '+str(g.dataset[g.data_cols[0]].dtype))
+	if len(g.data_cols) >=2:
+		print('type data 1: '+str(g.dataset[g.data_cols[1]].dtype))
+	print('Valid status: '+str(g.valid_graph))
+
 def extract_data_cols(g, terms):
 	try:
 		g.data_cols = [t for t in terms if t in g.dataset.columns.values]
@@ -131,7 +157,7 @@ def extract_geom(g, terms):
 		g.geom = 'density'
 	elif 'line' in terms:
 		g.geom = 'line'
-	elif 'point' in terms:
+	elif 'point' in terms or 'scatter' in terms:
 		g.geom = 'point'
 	elif len(g.data_cols) == 1:
 		g.geom = 'histogram'
@@ -163,12 +189,10 @@ def update_graph(g, terms):
 	g = extract_data_cols(g, terms)
 	g = extract_geom(g, terms)
 	g = extract_stat_functions(g, terms)
+	g = is_valid_plot(g)
 	
-	# Handle misunderstandings.
-	# TODO: Do this with phonetic/edit distance.
-	p = g.make_gg_plot()
-	print p
-	
+	return g
+
 if __name__ == "__main__":
 	main()
 
