@@ -2,7 +2,7 @@
 
 # Title: Demo of ggspeak
 # Author: Maurice Diesendruck
-# Last updated: 2015-08-15
+# Last updated: 2015-09-01
 #
 # Graph by voice.
 

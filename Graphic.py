@@ -2,9 +2,11 @@
 
 # Title: Graphic Object Class Definition
 # Author: Maurice Diesendruck
-# Last updated: 2015-08-15
+# Last updated: 2015-09-01
 #
 # Class for general graph object.
+#
+# Note: Changed ggplot source code. See link: http://bit.ly/1UkFZCO
 
 from ggplot import *
 from sys import exit
