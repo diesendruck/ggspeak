@@ -1,0 +1,114 @@
+%
+% File acl2015.tex
+%
+
+\documentclass[11pt]{article}
+\usepackage{acl2015}
+\usepackage{times}
+\usepackage{url}
+\usepackage{latexsym}
+\usepackage{datetime}
+
+%\setlength\titlebox{5cm}
+
+% You can expand the titlebox if you need extra space
+% to show all the authors. Please do not make the titlebox
+% smaller than 5cm (the original size); we will check this
+% in the camera-ready version and ask you to change it back.
+
+
+\title{Data Visualization By Voice: Syntax, Parsing, and Recognition Techniques}
+
+\author{Maurice Diesendruck \\
+  Department of Statistics and Data Sciences\\
+  University of Texas\\
+  Austin, TX \\
+  {\tt momod@utexas.edu} 
+  \\\And
+  Honghe Zhao \\
+  Department of Mathematics\\
+  University of Texas\\
+  Austin, TX \\
+  {\tt joehonghe@utexas.edu} \\
+  }
+
+\date{February 16, 2016}
+
+\begin{document}
+\maketitle
+\begin{abstract} 
+  This research identifies techniques that enable a computer system to perform automated data 
+  visualization by actively "listening" to a user's natural spoken language, in an interactive 
+  and real-time session. This work coins the name \textit{ggspeak} as the "grammar of 
+  graphics" for speech, and presents a Python library that incorporates speech recognition and
+  a domain-specific entity extraction algorithm that respects and resolves errors of
+  mistranscription.
+\end{abstract}
+
+\section{Introduction}
+As mobile and wearable computers become more powerful, interactions with such
+devices are likely to become more frequent, more personal, and more casual
+in style. Speech, in contrast to typing, presents an appropriate and comfortable way to
+communicate with such devices. 
+
+With computing becoming increasingly voice-driven, so too should applications and interfaces for data manipulation and visualization. Today, one can visualize data using (among other 
+things) Python's matplotlib, R's ggplot, or Microsoft's Excel; but these interfaces typically 
+require long work-flows of option selection and formatting, and can include cumbersome syntax. 
+To the best of the researcher's knowledge, there is no other publicly available system that targets a fluid, interactive, voice-driven data visualization interface.
+
+The closest related works by Harada et al.~\shortcite{Harada:07}, and Levin and
+Lieberman~\shortcite{Levin:04}, utilize speech to produce animations and other art.
+
+Project code for the system mentioned here is made available on the author's GitHub page at
+\url{https://github.com/diesendruck/ggspeak}.
+
+\section{Application}
+\subsection{Speech Recognition}
+The system utilizes the popular Python module SpeechRecognition~\cite{Zhang:16} to manage audio
+capture and transcription, and currently runs locally on the user's laptop.
+\subsection{Architecture}
+The user first selects a comma-separated values (CSV) file to be the data for the session. 
+The system then initializes a "Graphic" object, which will contain all relevant details for the 
+graph. At this point, the system begins to listen, and at each utterance, evaluates whether 
+words relating to graphical syntax are present. For example, did the words "scatterplot" or 
+"histogram" or "line graph" appear? Similarly, did the user say any names that match the CSV 
+column headers?
+
+Meanwhile, with each completed utterance, the system determines whether the user has asked to quit, and if not, whether the current graph details produce a valid graph. The interaction begins when the system produces a valid graph that can be further edited by the user in subsequent spoken commands.
+
+\subsection{Disambiguation and Mistranscription}
+While the scope of graphing vocabulary and syntax may seem small, it is difficult to 
+generalize the task of recognizing header names. Homophones, rhyming words, and non-English
+concatenations will typically be mistranscribed. Consider, for example, the headers "X", "Y", and "Under10". A user that says "plot X versus Y and group by Under10", may produce a transcription of "plot ex versus why and group by under ten".
+
+To resolve this, the researchers propose a fuzzy comparison or distance metric between phonetic encodings, e.g. distance between Soundex or Metaphone encodings.
+
+% include your own bib file like this:
+%\bibliographystyle{acl}
+%\bibliography{acl2015}
+
+\begin{thebibliography}{}
+
+\bibitem[\protect\citename{{Zhang}}2016]{Zhang:16}
+{Anthony Zhang}.
+\newblock 2016.
+\newblock {Speech Recognition (Version 3.1) [Software]}.
+\newblock {Available from \url{https://github.com/Uberi/speech_recognition#readme}}.
+
+\bibitem[\protect\citename{Levin and Lieberman}2004]{Levin:04}
+Golan Levin and Zachary Lieberman.
+\newblock 2004.
+\newblock {\em In-Situ} Speech Visualization in Real-Time Interactive Installation and Performance.
+\newblock {\em Proceedings of The 3rd International Symposium on Non-Photorealistic Animation and Rendering}.
+\newblock Annecy, France.
+
+\bibitem[\protect\citename{{Harada, Wobbrock, and Landay}}2007]{Harada:07}
+{Susumu Harada, Jacob~O. Wobbrock, and James~A. Landay}.
+\newblock 2007.
+\newblock {Voicedraw: a hands-free voice-driven drawing application for people with motor impairments}.
+\newblock {\em Proceedings of the 9th International ACM SIGACCESS Conference on Computers and Accessibility}.
+\newblock Tempe, Arizona, USA.
+
+\end{thebibliography}
+
+\end{document}
