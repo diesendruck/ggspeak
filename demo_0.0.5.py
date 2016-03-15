@@ -9,9 +9,12 @@
 import speech_recognition as sr
 import unicodedata
 import os
-from Graphic import Graphic
+from Graphic_mpl import Graphic
 from copy import copy
 import pandas as pd
+from matplotlib import pyplot as plt
+plt.style.use('ggplot')
+plt.ion()
 
 
 def main():
@@ -73,7 +76,7 @@ def create_graph(g, terms):
     # Search the command for instructions about specific graph attributes.
     g = extract_data_cols(g, terms)
     g = extract_geom(g, terms)
-    g = is_valid_plot(g)
+    g.is_valid_graph()
 
     return g
 
@@ -180,33 +183,6 @@ def is_save(terms):
     if wants_to_save:
         save = True
     return save
-
-
-def is_valid_plot(g):
-    if g.geom is None:
-        print("No geometry found.")
-    elif g.geom in ['point', 'line']:
-        if all([len(g.data_cols) == 2,
-                g.dataset[g.data_cols[0]].dtype in ['float64', 'int64'],
-                g.dataset[g.data_cols[1]].dtype in ['float64', 'int64']]):
-            g.valid_graph = True
-    elif g.geom in ['histogram', 'bar']:
-        if len(g.data_cols) == 1:
-            g.valid_graph = True
-    summarize_graph(g)
-    return g
-
-
-def summarize_graph(g):
-    print(' - Summary - ')
-    print('Dataset: '+g.filename)
-    print('Geom: '+g.geom)
-    print('Datacols: '+str(g.data_cols))
-    if len(g.data_cols) >= 1:
-        print('type data 0: '+str(g.dataset[g.data_cols[0]].dtype))
-    if len(g.data_cols) >= 2:
-        print('type data 1: '+str(g.dataset[g.data_cols[1]].dtype))
-    print('Valid status: '+str(g.valid_graph))
 
 
 def extract_data_cols(g, terms):
