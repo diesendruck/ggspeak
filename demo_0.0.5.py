@@ -1,224 +1,139 @@
 #!/usr/bin/python
 
-# Title: Demo of ggspeak
+# Title: Graphic Object Class Definition
 # Author: Maurice Diesendruck
 # Last updated: 2015-09-01
 #
-# Graph by voice.
+# Class for general graph object.
+#
+# Note: Changed ggplot source code. See link: http://bit.ly/1UkFZCO
 
-import speech_recognition as sr
-import unicodedata
-import os
-from Graphic_mpl import Graphic
-from copy import copy
-import pandas as pd
+import numpy as np
+from collections import Counter
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 plt.ion()
 
 
-def main():
-    # Give introduction to program and goal.
-    introduction()
+class Graphic(object):
+    """A general graph template.
 
-    # Get recognizer and microphone objects.
-    r, mic = prepare_mic()
+    Declares all the attributes that a graphing library would need, to build
+    the string used to plot the graph.
+    """
 
-    # Instantiate empty graph object.
-    g_empty = Graphic()
+    def __init__(self):
+        """Defines characteristics of graph.
 
-    # Set dataset and filename values of graph object by choosing dataset.
-    g_base = choose_dataset(g_empty)
-    g = copy(g_base)
+        Sets values for graph characteristics. Some are None, others are
+        strings or numbers.
+        """
+        self.dataset = None
+        self.filename = None
+        self.data_cols = []
+        self.geom = None
+        self.color = 'steelblue'
+        self.xscale = [None, None]
+        self.yscale = [None, None]
+        self.xlab = None
+        self.ylab = None
+        self.title = None
+        self.add_smooth = False
+        self.valid_graph = False
 
-    # Run speech recognition and graphing in a streaming format.
-    attentive = True
-    while attentive:
-        with mic as source:
-            audio = get_audio(r, source)
-            try:
-                text = r.recognize(audio)
-                print('You said: ' + text)
-            except LookupError:
-                print("Didn't get audio.")
-                continue
-            # See if command is quit, reset, save, or edit.
-            if text:
-                terms = tokenize(text)
-                attentive = is_attentive(terms)
-                if not attentive:
-                    print 'Goodbye'
-                    return None
-                elif is_save(terms):
-                    continue
-                elif is_reset(terms):
-                    g = copy(g_base)
-                elif g.has_base():
-                    g = update_graph(g, terms)
+    def has_base(self):
+        if self.geom in ['point', 'line']:
+            if len(self.data_cols) == 2:
+                return True
+        elif self.geom in ['hist', 'bar']:
+            if len(self.data_cols) == 1:
+                return True
+        else:
+            return False
+
+    def make_gg_plot(self):
+        """Builds graph with matplotlib.
+
+        Assembles characteristics in the syntax of the graphic library.
+        """
+        # Make a scatter plot.
+        if self.geom in ['point']:
+            d1_name = str(self.data_cols[0])
+            d2_name = str(self.data_cols[1])
+            d1 = self.dataset[d1_name]
+            d2 = self.dataset[d2_name]
+
+            plt.scatter(d1, d2, alpha=0.5)
+            plt.xlabel(d1_name)
+            plt.ylabel(d2_name)
+            plt.title('Scatter plot of {} and {}'.format(d1_name, d2_name))
+
+        # Make a histogram or bar chart.
+        elif self.geom in ['hist', 'bar']:
+
+            d_name = str(self.data_cols[0])
+            d = self.dataset[d_name]
+            d_type = d.dtype
+
+            # If geom is hist and data is numeric, make a histogram.
+            if (self.geom == 'hist' and d_type in ['float64', 'int64']):
+                plt.hist(d, alpha=0.5)
+                plt.xlabel(d_name)
+                plt.ylabel('Count')
+                plt.title('Histogram of '+d_name)
+            else:
+                # If geom is bar or data is categorical, make a bar chart.
+                freqs = Counter(d)
+                f = sorted(freqs.items(), key=lambda (k, v): -v)
+                names = [i for (i, j) in f]
+                counts = [j for (i, j) in f]
+                positions = np.arange(len(f))
+                plt.bar(positions, counts, align='center', alpha=0.5)
+                plt.xticks(positions, names)
+                plt.xlabel(d_name)
+                plt.ylabel('Count')
+                plt.title('Bar chart of '+d_name)
+
+        else:
+            print('Unsure how to build plot.')
+
+        return None
+
+    def is_valid_graph(self):
+        if self.geom is None:
+            self.valid_graph = False
+        elif self.geom in ['point', 'line']:
+            if all([len(self.data_cols) == 2,
+                    self.dataset[self.data_cols[0]].dtype in ['float64',
+                                                              'int64'],
+                    self.dataset[self.data_cols[1]].dtype in ['float64',
+                                                              'int64']]):
+                self.valid_graph = True
+            else:
+                print 'Cannot plot if a variable is not numeric.'
+        elif self.geom in ['hist', 'bar']:
+            if len(self.data_cols) == 1:
+                d_name = str(self.data_cols[0])
+                d = self.dataset[d_name]
+                d_type = d.dtype
+                if not (self.geom == 'hist' and d_type not in ['float64',
+                                                               'int64']):
+                    self.valid_graph = True
                 else:
-                    g = create_graph(g, terms)
-                g.make_gg_plot()
+                    print 'Cannot make histogram from categorical variable.'
+        else:
+            self.valid_graph = False
 
+        return self.valid_graph
 
-def create_graph(g, terms):
-    """Receives text data, and creates basic graph string.
-
-    Pulls relevant instructions from terms, creates Graphic object with
-    new values, and plots Graphic.
-
-    Args:
-        g: Graphic object.
-        terms: Tokens from latest voice command.
-
-    Returns:
-        g: Graphic object.
-    """
-    # Search the command for instructions about specific graph attributes.
-    g = extract_data_cols(g, terms)
-    g = extract_geom(g, terms)
-    g.is_valid_graph()
-
-    return g
-
-
-def update_graph(g, terms):
-    """Receives text data, and creates basic graph string.
-
-    Pulls relevant instructions from terms, creates Graphic object with
-    new values, and plots Graphic.
-
-    Args:
-        g: Graphic object.
-        terms: Tokens from latest voice command.
-
-    Returns:
-        g: Graphic object.
-    """
-    g = extract_stat_functions(g, terms)
-    return g
-
-
-def introduction():
-    print('\n\n----------- GGSPEAK: Graph by Voice ------------')
-
-
-def prepare_mic():
-    """Instantiates recognizer and microphone objects.
-
-    These objects come from the speech_recognition package.
-
-    Args:
-    NA
-
-    Returns:
-    r: A recognizer object.
-    m: A microphone object.
-    """
-    r = sr.Recognizer()
-    m = sr.Microphone()
-    with m as source:
-        r.adjust_for_ambient_noise(source, duration=2)
-        r.pause_threshold = 1.5
-    return r, m
-
-
-def choose_dataset(g):
-    print 'Type file name.'
-    filename = os.getcwd()+'/'+raw_input('Filename: '+os.getcwd()+'/')
-    try:
-        dataset = pd.read_csv(filename)
-    except LookupError:
-        print("No document found.")
-
-    # Set dataset as the chosen file.
-    g.dataset = dataset
-    g.filename = filename
-
-    names = '[' + ', '.join(list(g.dataset.columns.values)) + ']'
-    names = names.upper()
-    print('\nYou are using the dataset ' + g.filename)
-    print('Data preview:')
-    print(g.dataset.head(5))
-    print
-
-    return g
-
-
-def get_audio(r, source):
-    print "\n Listening..."
-    audio = r.listen(source)
-    return audio
-
-
-def tokenize(text):
-    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore')
-    text = text.lower()
-    terms = text.split(' ')
-    return terms
-
-
-def is_attentive(terms):
-    attentive = True
-    quit_words = [
-        'quit', 'stop', 'done', 'finish', 'finished', 'end', 'enough']
-    wants_to_quit = bool(set(quit_words) & set(terms))
-    if wants_to_quit:
-        attentive = False
-    return attentive
-
-
-def is_reset(terms):
-    reset = False
-    reset_words = ['reset']
-    wants_to_reset = bool(set(reset_words) & set(terms))
-    if wants_to_reset:
-        reset = True
-    return reset
-
-
-def is_save(terms):
-    save = False
-    save_words = ['save']
-    wants_to_save = bool(set(save_words) & set(terms))
-    if wants_to_save:
-        save = True
-    return save
-
-
-def extract_data_cols(g, terms):
-    try:
-        g.data_cols = [t for t in terms if t in g.dataset.columns.values]
-        print('Relevant variables: ' + str(g.data_cols))
-    except:
-        print('Did not catch any matching variable names.')
-    return g
-
-
-def extract_geom(g, terms):
-    if 'histogram' in terms:
-        g.geom = 'histogram'
-    elif 'bar' in terms or 'barplot' in terms:
-        g.geom = 'bar'
-    elif 'density' in terms:
-        g.geom = 'density'
-    elif 'line' in terms:
-        g.geom = 'line'
-    elif 'point' in terms or 'scatter' in terms:
-        g.geom = 'point'
-    elif len(g.data_cols) == 1:
-        g.geom = 'histogram'
-    elif len(g.data_cols) == 2:
-        g.geom = 'point'
-    else:
-        print("Couldn't identify geometry of graph.")
-    return g
-
-
-def extract_stat_functions(g, terms):
-    if 'smooth' in terms:
-        g.add_smooth = True
-    return g
-
-
-if __name__ == "__main__":
-    main()
+    def summarize(self):
+        print(' - Summary - ')
+        print('Dataset: '+self.filename)
+        print('Geom: '+str(self.geom))
+        print('Datacols: '+str(self.data_cols))
+        if len(self.data_cols) == 1:
+            print('Type data 0: '+str(self.dataset[self.data_cols[0]].dtype))
+        if len(self.data_cols) == 2:
+            print('Type data 1: '+str(self.dataset[self.data_cols[1]].dtype))
+        print('Valid status: '+str(self.is_valid_graph()))
+        return self
