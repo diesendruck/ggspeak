@@ -9,6 +9,7 @@
 # Note: Changed ggplot source code. See link: http://bit.ly/1UkFZCO
 
 import numpy as np
+from copy import copy
 from collections import Counter
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
@@ -31,6 +32,7 @@ class Graphic(object):
         self.dataset = None
         self.filename = None
         self.data_cols = []
+        self.grouping = None
         self.geom = None
         self.color = 'steelblue'
         self.xscale = [None, None]
@@ -38,17 +40,21 @@ class Graphic(object):
         self.xlab = None
         self.ylab = None
         self.title = None
+        self.base = False
         self.add_smooth = False
         self.valid_graph = False
 
     def has_base(self):
         if self.geom in ['point', 'line']:
             if len(self.data_cols) == 2:
+                self.base = True
                 return True
         elif self.geom in ['hist', 'bar']:
             if len(self.data_cols) == 1:
+                self.base = True
                 return True
         else:
+            self.base = False
             return False
 
     def make_gg_plot(self):
@@ -63,10 +69,25 @@ class Graphic(object):
             d1 = self.dataset[d1_name]
             d2 = self.dataset[d2_name]
 
-            plt.scatter(d1, d2, alpha=0.5)
             plt.xlabel(d1_name)
             plt.ylabel(d2_name)
             plt.title('Scatter plot of {} and {}'.format(d1_name, d2_name))
+
+            # Make grouped plot, if necessary.
+            if self.grouping is None:
+                plt.scatter(d1, d2, alpha=0.5)
+            else:
+                d_temp = copy(self.dataset)
+                grouping_name = self.grouping
+                grouping_type = d_temp[grouping_name].dtype
+                if grouping_type not in ['float64', 'int64']:
+                    categories = np.unique(d_temp[grouping_name])
+                    colors = np.linspace(0, 1, len(categories))
+                    colordict = dict(zip(categories, colors))
+
+                    d_temp['CategoryColor'] = d_temp[grouping_name].apply(
+                        lambda x: colordict[x])
+                    plt.scatter(d1, d2, c=d_temp.CategoryColor)
 
         # Make a histogram or bar chart.
         elif self.geom in ['hist', 'bar']:
@@ -127,13 +148,15 @@ class Graphic(object):
         return self.valid_graph
 
     def summarize(self):
-        print(' - Summary - ')
-        print('Dataset: '+self.filename)
-        print('Geom: '+str(self.geom))
-        print('Datacols: '+str(self.data_cols))
+        print ' - Summary - '
+        print 'Dataset: {}'.format(self.filename)
+        print 'Geom: {}'.format(str(self.geom))
+        print 'Datacols: {}'.format(str(self.data_cols))
+        print 'Grouping: {}'.format(str(self.grouping))
         if len(self.data_cols) == 1:
             print('Type data 0: '+str(self.dataset[self.data_cols[0]].dtype))
         if len(self.data_cols) == 2:
+            print('Type data 0: '+str(self.dataset[self.data_cols[0]].dtype))
             print('Type data 1: '+str(self.dataset[self.data_cols[1]].dtype))
-        print('Valid status: '+str(self.is_valid_graph()))
+        print 'Valid status: {}'.format(str(self.is_valid_graph()))
         return self

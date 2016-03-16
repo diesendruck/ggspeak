@@ -59,23 +59,14 @@ def main():
                     data_preview(g)
                     print 'DEFINE a new graph.'
                 elif is_summary(terms):
+                    data_preview(g)
                     g.summarize()
                 elif g.has_base():
-                    print 'BASE is set. Now reset, or adjust features.'
                     g = update_graph(g, terms)
-                    graph_if_valid(g)
+                    g = graph_if_valid(g, g_base)
                 else:
                     g = create_graph(g, terms)
-                    graph_if_valid(g)
-
-
-def graph_if_valid(g):
-    # Graph the plot if it's valid, otherwise summarize.
-    if g.is_valid_graph():
-        g.make_gg_plot()
-    else:
-        print 'INVALID graph.'
-        g.summarize()
+                    g = graph_if_valid(g, g_base)
 
 
 def create_graph(g, terms):
@@ -111,6 +102,19 @@ def update_graph(g, terms):
     """
     if g.geom == 'point':
         g = extract_stat_functions(g, terms)
+    g = extract_grouping(g, terms)
+    return g
+
+
+def graph_if_valid(g, g_base):
+    # Graph the plot if it's valid, otherwise summarize.
+    if g.is_valid_graph():
+        g.make_gg_plot()
+    else:
+        print 'INVALID graph.'
+        g.summarize()
+        print 'Reseting graph.'
+        g = copy(g_base)
     return g
 
 
@@ -134,7 +138,7 @@ def prepare_mic():
     m = sr.Microphone()
     with m as source:
         r.adjust_for_ambient_noise(source, duration=2)
-        r.pause_threshold = 1.0
+        r.pause_threshold = 0.5
     return r, m
 
 
@@ -177,7 +181,7 @@ def tokenize(text):
 
 def is_quit(terms):
     quit_words = ['quit', 'stop', 'done', 'finish', 'finished', 'end', 'enough',
-                  'exit', 'goodbye']
+                  'exit', 'goodbye', 'close']
     wants_to_quit = bool(set(quit_words) & set(terms))
     return wants_to_quit
 
@@ -201,11 +205,21 @@ def is_save(terms):
 
 
 def extract_data_cols(g, terms):
-    try:
-        g.data_cols = [t for t in terms if t in g.dataset.columns.values]
-        print('Relevant variables: ' + str(g.data_cols))
-    except:
-        print('Did not catch any matching variable names.')
+    if not g.has_base():
+        try:
+            g.data_cols = [t for t in terms if t in g.dataset.columns.values]
+            print('Relevant variables: ' + str(g.data_cols))
+        except:
+            print('Did not catch any matching variable names.')
+    else:
+        try:
+            g.grouping = [t for t in terms if t in g.dataset.columns.values]
+            # Take only last matching name.
+            if len(g.grouping) > 1:
+                g.grouping = str(g.grouping[-1])
+            print('Relevant variables: ' + str(g.grouping))
+        except:
+            print('Did not catch any matching variable names.')
     return g
 
 
@@ -236,6 +250,12 @@ def extract_geom(g, terms):
 def extract_stat_functions(g, terms):
     if 'smooth' in terms:
         g.add_smooth = True
+    return g
+
+
+def extract_grouping(g, terms):
+    if 'group' in terms:
+        extract_data_cols(g, terms)
     return g
 
 
