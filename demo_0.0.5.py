@@ -69,55 +69,6 @@ def main():
                     g = graph_if_valid(g, g_base)
 
 
-def create_graph(g, terms):
-    """With terms, extracts basic graph elements.
-
-    Gets data columns and geometry of graph.
-
-    Args:
-        g: Graphic object.
-        terms: Terms from latest voice command.
-
-    Returns:
-        g: Graphic object.
-    """
-    # Search the command for instructions about specific graph attributes.
-    g = extract_data_cols(g, terms)
-    g = extract_geom(g, terms)
-    return g
-
-
-def update_graph(g, terms):
-    """With terms, edits ancillary graph features, like titles and labels.
-
-    Determines ancillary features, like titles, labels, smoothing functions,
-    groupings, stackings, etc.
-
-    Args:
-        g: Graphic object.
-        terms: Tokens from latest voice command.
-
-    Returns:
-        g: Graphic object.
-    """
-    if g.geom == 'point':
-        g = extract_stat_functions(g, terms)
-    g = extract_grouping(g, terms)
-    return g
-
-
-def graph_if_valid(g, g_base):
-    # Graph the plot if it's valid, otherwise summarize.
-    if g.is_valid_graph():
-        g.make_gg_plot()
-    else:
-        print 'INVALID graph.'
-        g.summarize()
-        print 'Reseting graph.'
-        g = copy(g_base)
-    return g
-
-
 def introduction():
     print('\n\n----------- GGSPEAK: Graph by Voice ------------')
 
@@ -204,13 +155,66 @@ def is_save(terms):
     return wants_to_save
 
 
+def create_graph(g, terms):
+    """With terms, extracts basic graph elements.
+
+    Gets data columns and geometry of graph.
+
+    Args:
+        g: Graphic object.
+        terms: Terms from latest voice command.
+
+    Returns:
+        g: Graphic object.
+    """
+    # Search the command for instructions about specific graph attributes.
+    g = extract_data_cols(g, terms)
+    g = extract_geom(g, terms)
+    return g
+
+
+def update_graph(g, terms):
+    """With terms, edits ancillary graph features, like titles and labels.
+
+    Determines ancillary features, like titles, labels, smoothing functions,
+    groupings, stackings, etc.
+
+    Args:
+        g: Graphic object.
+        terms: Tokens from latest voice command.
+
+    Returns:
+        g: Graphic object.
+    """
+    if g.geom == 'point':
+        g = extract_stat_functions(g, terms)
+    g = extract_grouping(g, terms)
+    plt.clf()
+    return g
+
+
+def graph_if_valid(g, g_base):
+    # Graph the plot if it's valid, otherwise summarize.
+    if g.is_valid_graph():
+        g.make_gg_plot()
+    else:
+        print 'INVALID graph.'
+        g.summarize()
+        print 'Reseting graph.'
+        g = copy(g_base)
+    return g
+
+
 def extract_data_cols(g, terms):
+    # Get first data cols.
     if not g.has_base():
         try:
             g.data_cols = [t for t in terms if t in g.dataset.columns.values]
             print('Relevant variables: ' + str(g.data_cols))
         except:
             print('Did not catch any matching variable names.')
+
+    # Already has base, so find grouping variables.
     else:
         try:
             g.grouping = [t for t in terms if t in g.dataset.columns.values]
@@ -226,12 +230,12 @@ def extract_data_cols(g, terms):
 def extract_geom(g, terms):
     if 'histogram' in terms:
         g.geom = 'hist'
-    elif 'bar' in terms or 'barplot' in terms:
-        g.geom = 'bar'
     elif 'density' in terms:
         g.geom = 'density'
     elif 'line' in terms:
         g.geom = 'line'
+    elif 'bar' in terms or 'barplot' in terms:
+        g.geom = 'bar'
     elif 'point' in terms or 'scatter' in terms:
         g.geom = 'point'
     elif len(g.data_cols) == 1:
@@ -254,9 +258,16 @@ def extract_stat_functions(g, terms):
 
 
 def extract_grouping(g, terms):
-    if 'group' in terms:
+    bi = bigrams(terms)
+    if any([['group', 'by'] in bi, ['group', 'x'] in bi,
+            ['color', 'by'] in bi, ['color', 'x']]):
         extract_data_cols(g, terms)
     return g
+
+
+def bigrams(terms):
+    bigrams = [[terms[i], terms[i+1]] for i in range(len(terms)-1)]
+    return bigrams
 
 
 if __name__ == "__main__":

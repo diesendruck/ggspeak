@@ -9,9 +9,12 @@
 # Note: Changed ggplot source code. See link: http://bit.ly/1UkFZCO
 
 import numpy as np
+import pandas as pd
 from copy import copy
 from collections import Counter
 from matplotlib import pyplot as plt
+import matplotlib.colors as mplcolors
+import matplotlib.cm as cmx
 plt.style.use('ggplot')
 plt.ion()
 
@@ -64,59 +67,113 @@ class Graphic(object):
         """
         # Make a scatter plot.
         if self.geom in ['point']:
+            # Make some data shortcuts.
             d1_name = str(self.data_cols[0])
             d2_name = str(self.data_cols[1])
             d1 = self.dataset[d1_name]
             d2 = self.dataset[d2_name]
-
+            # Prepare figure.
             plt.xlabel(d1_name)
             plt.ylabel(d2_name)
-            plt.title('Scatter plot of {} and {}'.format(d1_name, d2_name))
+            plt.title('{} vs {}'.format(d1_name, d2_name))
 
-            # Make grouped plot, if necessary.
+            # Make regular scatterplot, if no grouping is defined.
             if self.grouping is None:
-                plt.scatter(d1, d2, alpha=0.5)
-            else:
-                d_temp = copy(self.dataset)
-                grouping_name = self.grouping
-                grouping_type = d_temp[grouping_name].dtype
-                if grouping_type not in ['float64', 'int64']:
-                    categories = np.unique(d_temp[grouping_name])
-                    colors = np.linspace(0, 1, len(categories))
-                    colordict = dict(zip(categories, colors))
+                plt.scatter(d1, d2, edgecolors='none', alpha=0.5)
 
-                    d_temp['CategoryColor'] = d_temp[grouping_name].apply(
-                        lambda x: colordict[x])
-                    plt.scatter(d1, d2, c=d_temp.CategoryColor)
+            # Make grouped scatterplot, if grouping is defined.
+            else:
+                d = copy(self.dataset)
+                grouping_name = self.grouping
+                print 'Grouping name: {}'.format(grouping_name)
+                try:
+                    group_example = d[grouping_name][0]
+                except:
+                    print 'Group example caused problems. Try again.'
+                    print d[grouping_name].head(3)
+                    print grouping_name
+                    return None
+
+                # Categorical grouping.
+                if not isinstance(group_example, (int, long, float)):
+                    cat_vals = np.unique(d[grouping_name])
+                    # Prepare color coding.
+                    cmap = plt.get_cmap('Paired')
+                    colors = mplcolors.Normalize(vmin=0, vmax=len(cat_vals))
+                    colors = cmx.ScalarMappable(norm=colors, cmap=cmap)
+                    for i in range(len(cat_vals)):
+                        category_indices = (d[grouping_name] == cat_vals[i])
+                        plt.scatter(d[d1_name][category_indices],
+                                    d[d2_name][category_indices],
+                                    c=colors.to_rgba(i), label=cat_vals[i],
+                                    marker='o', edgecolors='none')
+                    plt.legend()
+
+                # Numerical grouping.
+                else:
+                    # Color using colorbar.
+                    cmap = plt.get_cmap('YlGnBu')
+                    p = plt.scatter(d[d1_name], d[d2_name], c=d[grouping_name],
+                                    cmap=cmap, marker='o', edgecolors='none',
+                                    vmin=min(d[grouping_name]),
+                                    vmax=max(d[grouping_name]))
+                    cb = plt.colorbar(p)
+                    cb.set_label(grouping_name)
 
         # Make a histogram or bar chart.
         elif self.geom in ['hist', 'bar']:
 
+            d = self.dataset
             d_name = str(self.data_cols[0])
-            d = self.dataset[d_name]
-            d_type = d.dtype
+            d_type = d[d_name].dtype
+            plt.xlabel(d_name)
+            plt.ylabel('Count')
+            plt.title('Distribution of {}'.format(d_name))
 
-            # If geom is hist and data is numeric, make a histogram.
+            # Make a histogram, if geom is hist and data is numeric.
             if (self.geom == 'hist' and d_type in ['float64', 'int64']):
-                plt.hist(d, alpha=0.5)
-                plt.xlabel(d_name)
-                plt.ylabel('Count')
-                plt.title('Histogram of '+d_name)
+
+                # Make regular histogram, if no grouping.
+                if self.grouping is None:
+                    plt.hist(d[d_name], alpha=0.5)
+                # Make grouped histogram, if has grouping.
+                else:
+                    print 'Not yet sure how to group a histogram.'
+
+            # Make a bar chart, if geom is bar or data is categorical.
             else:
-                # If geom is bar or data is categorical, make a bar chart.
-                freqs = Counter(d)
-                f = sorted(freqs.items(), key=lambda (k, v): -v)
-                names = [i for (i, j) in f]
-                counts = [j for (i, j) in f]
-                positions = np.arange(len(f))
-                plt.bar(positions, counts, align='center', alpha=0.5)
-                plt.xticks(positions, names)
-                plt.xlabel(d_name)
-                plt.ylabel('Count')
-                plt.title('Bar chart of '+d_name)
+
+                # Make regular bar chart, if no grouping.
+                if self.grouping is None:
+                    freqs = Counter(d[d_name])
+                    f = sorted(freqs.items(), key=lambda (k, v): -v)
+                    names = [i for (i, j) in f]
+                    counts = [j for (i, j) in f]
+                    positions = np.arange(len(f))
+                    plt.bar(positions, counts, align='center', alpha=0.5)
+                    plt.xticks(positions, names)
+
+                # Make grouped bar chart, if has grouping.
+                else:
+                    grouping_name = self.grouping
+                    try:
+                        group_example = d[grouping_name][0]
+                    except:
+                        print 'Group example caused problems. Try again.'
+                        return None
+
+                    # Categorical grouping.
+                    if not isinstance(group_example, (int, long, float)):
+                        ct = pd.crosstab(index=d[d_name],
+                                         columns=d[self.grouping])
+                        pl = ct.plot.bar()
+                        pl.set_xlabel(d_name)
+                        pl.set_ylabel('Count')
+                    else:
+                        print 'Not sure how to group by numeric vars.'
 
         else:
-            print('Unsure how to build plot.')
+            print('Not yet sure how to build this plot.')
 
         return None
 
@@ -152,7 +209,7 @@ class Graphic(object):
         print 'Dataset: {}'.format(self.filename)
         print 'Geom: {}'.format(str(self.geom))
         print 'Datacols: {}'.format(str(self.data_cols))
-        print 'Grouping: {}'.format(str(self.grouping))
+        print 'Grouping: \'{}\''.format(str(self.grouping))
         if len(self.data_cols) == 1:
             print('Type data 0: '+str(self.dataset[self.data_cols[0]].dtype))
         if len(self.data_cols) == 2:
