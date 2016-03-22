@@ -10,7 +10,6 @@
 
 import numpy as np
 import pandas as pd
-from copy import copy
 from collections import Counter
 from matplotlib import pyplot as plt
 import matplotlib.colors as mplcolors
@@ -47,24 +46,13 @@ class Graphic(object):
         self.add_smooth = False
         self.valid_graph = False
 
-    def has_base(self):
-        if self.geom in ['point', 'line']:
-            if len(self.data_cols) == 2:
-                self.base = True
-                return True
-        elif self.geom in ['hist', 'bar']:
-            if len(self.data_cols) == 1:
-                self.base = True
-                return True
-        else:
-            self.base = False
-            return False
-
     def make_gg_plot(self):
         """Builds graph with matplotlib.
 
         Assembles characteristics in the syntax of the graphic library.
         """
+        print self.summarize()
+
         # Make a scatter plot.
         if self.geom in ['point']:
             # Make some data shortcuts.
@@ -83,7 +71,7 @@ class Graphic(object):
 
             # Make grouped scatterplot, if grouping is defined.
             else:
-                d = copy(self.dataset)
+                d = self.dataset
                 grouping_name = self.grouping
                 print 'Grouping name: {}'.format(grouping_name)
                 try:
@@ -125,20 +113,21 @@ class Graphic(object):
 
             d = self.dataset
             d_name = str(self.data_cols[0])
-            d_type = d[d_name].dtype
+            d_var_example = d[d_name][0]
             plt.xlabel(d_name)
             plt.ylabel('Count')
             plt.title('Distribution of {}'.format(d_name))
 
             # Make a histogram, if geom is hist and data is numeric.
-            if (self.geom == 'hist' and d_type in ['float64', 'int64']):
+            if (self.geom == 'hist' and isinstance(d_var_example, (int, long,
+                                                                   float))):
 
                 # Make regular histogram, if no grouping.
                 if self.grouping is None:
-                    plt.hist(d[d_name], alpha=0.5)
+                    d[d_name].hist(alpha=0.5)
                 # Make grouped histogram, if has grouping.
                 else:
-                    print 'Not yet sure how to group a histogram.'
+                    d[d_name].hist(by=d[self.grouping], alpha=0.5)
 
             # Make a bar chart, if geom is bar or data is categorical.
             else:
@@ -181,14 +170,17 @@ class Graphic(object):
         if self.geom is None:
             self.valid_graph = False
         elif self.geom in ['point', 'line']:
-            if all([len(self.data_cols) == 2,
-                    self.dataset[self.data_cols[0]].dtype in ['float64',
-                                                              'int64'],
-                    self.dataset[self.data_cols[1]].dtype in ['float64',
-                                                              'int64']]):
-                self.valid_graph = True
-            else:
-                print 'Cannot plot if a variable is not numeric.'
+            try:
+                if all([len(self.data_cols) == 2,
+                        self.dataset[self.data_cols[0]].dtype in ['float64',
+                                                                  'int64'],
+                        self.dataset[self.data_cols[1]].dtype in ['float64',
+                                                                  'int64']]):
+                    self.valid_graph = True
+                else:
+                    print 'Cannot plot if a variable is not numeric.'
+            except:
+                print 'Cannot identify data_cols.'
         elif self.geom in ['hist', 'bar']:
             if len(self.data_cols) == 1:
                 d_name = str(self.data_cols[0])
@@ -204,12 +196,25 @@ class Graphic(object):
 
         return self.valid_graph
 
+    def has_base(self):
+        if self.geom in ['point', 'line']:
+            if len(self.data_cols) == 2:
+                self.base = True
+                return True
+        elif self.geom in ['hist', 'bar']:
+            if len(self.data_cols) == 1:
+                self.base = True
+                return True
+        else:
+            self.base = False
+            return False
+
     def summarize(self):
         print ' - Summary - '
         print 'Dataset: {}'.format(self.filename)
         print 'Geom: {}'.format(str(self.geom))
         print 'Datacols: {}'.format(str(self.data_cols))
-        print 'Grouping: \'{}\''.format(str(self.grouping))
+        print 'Grouping: {}'.format(str(self.grouping))
         if len(self.data_cols) == 1:
             print('Type data 0: '+str(self.dataset[self.data_cols[0]].dtype))
         if len(self.data_cols) == 2:

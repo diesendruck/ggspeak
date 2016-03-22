@@ -9,9 +9,10 @@
 import speech_recognition as sr
 import unicodedata
 import os
-from Graphic_mpl import Graphic
-from copy import copy
 import pandas as pd
+from copy import copy
+from Graphic_mpl import Graphic
+from jellyfish import levenshtein_distance as ld
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 plt.ion()
@@ -28,8 +29,8 @@ def main():
     g_empty = Graphic()
 
     # Set dataset and filename values of graph object by choosing dataset.
-    g_base = choose_dataset(g_empty)
-    g = copy(g_base)
+    g_data_only = choose_dataset(g_empty)
+    g = copy(g_data_only)
 
     # Run speech recognition and graphing in a streaming format.
     while 1:
@@ -55,7 +56,7 @@ def main():
                     continue
                 elif is_reset(terms):
                     plt.clf()
-                    g = copy(g_base)
+                    g = copy(g_data_only)
                     data_preview(g)
                     print 'DEFINE a new graph.'
                 elif is_summary(terms):
@@ -63,10 +64,10 @@ def main():
                     g.summarize()
                 elif g.has_base():
                     g = update_graph(g, terms)
-                    g = graph_if_valid(g, g_base)
+                    g = graph_if_valid(g, g_data_only)
                 else:
                     g = create_graph(g, terms)
-                    g = graph_if_valid(g, g_base)
+                    g = graph_if_valid(g, g_data_only)
 
 
 def introduction():
@@ -193,7 +194,7 @@ def update_graph(g, terms):
     return g
 
 
-def graph_if_valid(g, g_base):
+def graph_if_valid(g, g_data_only):
     # Graph the plot if it's valid, otherwise summarize.
     if g.is_valid_graph():
         g.make_gg_plot()
@@ -201,7 +202,7 @@ def graph_if_valid(g, g_base):
         print 'INVALID graph.'
         g.summarize()
         print 'Reseting graph.'
-        g = copy(g_base)
+        g = copy(g_data_only)
     return g
 
 
@@ -210,6 +211,8 @@ def extract_data_cols(g, terms):
     if not g.has_base():
         try:
             g.data_cols = [t for t in terms if t in g.dataset.columns.values]
+            # Get fuzzy match for column names, respecting homophones.
+            # g.data_cols = homophone_matches(terms, g.dataset.columns.values)
             print('Relevant variables: ' + str(g.data_cols))
         except:
             print('Did not catch any matching variable names.')
@@ -219,15 +222,32 @@ def extract_data_cols(g, terms):
         try:
             g.grouping = [t for t in terms if t in g.dataset.columns.values]
             # Take only last matching name.
-            if len(g.grouping) > 1:
-                g.grouping = str(g.grouping[-1])
-            print('Relevant variables: ' + str(g.grouping))
+            g.grouping = str(g.grouping[-1])
+            # Get fuzzy match for column names, respecting homophones.
+            # g.data_cols = homophone_matches(terms, g.dataset.columns.values)
+            print('Relevant variables: ' + g.grouping)
         except:
             print('Did not catch any matching variable names.')
     return g
 
 
+def homophone_matches(terms, targets):
+    # Given two lists, return intersection (with lenience for homophones).
+    excluded_words = ['vs']
+    targets = [t for t in targets if t not in excluded_words]
+    orig_targets = targets
+    terms = map(unicode, terms)
+    targets = map(unicode, targets)
+    matches = []
+    for i in range(len(terms)):
+        for j in range(len(targets)):
+            if ld(terms[i], targets[j]) <= 1:
+                matches.append(orig_targets[j])
+    return matches
+
+
 def extract_geom(g, terms):
+    # Simple keyword detection.
     if 'histogram' in terms:
         g.geom = 'hist'
     elif 'density' in terms:
@@ -238,17 +258,51 @@ def extract_geom(g, terms):
         g.geom = 'bar'
     elif 'point' in terms or 'scatter' in terms:
         g.geom = 'point'
-    elif len(g.data_cols) == 1:
-        d_type = g.dataset[g.data_cols[0]].dtype
-        if d_type in ['float64', 'int64']:
+    else:
+        g = infer_geom(g, terms)
+    return g
+
+
+def infer_geom(g, terms):
+    # Infer based on number of data columns and their types.
+    if len(g.data_cols) == 1:
+        print('Inferring graph geometry.')
+        d_example = g.dataset[g.data_cols[0]][0]
+        if is_numeric(d_example):
             g.geom = 'hist'
         else:
             g.geom = 'bar'
     elif len(g.data_cols) == 2:
-        g.geom = 'point'
+        print('Inferring graph geometry.')
+        d1_name = g.data_cols[0]
+        d2_name = g.data_cols[1]
+        d1_example = g.dataset[d1_name][0]
+        d2_example = g.dataset[d2_name][0]
+        # Case of both numeric.
+        if is_numeric(d1_example) and is_numeric(d2_example):
+            g.geom = 'point'
+        # Case where one is numeric.
+        elif is_numeric(d1_example) or is_numeric(d2_example):
+            g.geom = 'hist'
+            if is_numeric(d1_example):
+                g.data_cols = [d1_name]
+                g.grouping = d2_name
+            else:
+                g.data_cols = [d2_name]
+                g.grouping = d1_name
+        # Case where both are categorical.
+        else:
+            g.geom = 'bar'
+            g.data_cols = [d1_name]
+            g.grouping = d2_name
+
     else:
         print("Couldn't identify geometry of graph.")
     return g
+
+
+def is_numeric(v):
+    return isinstance(v, (int, long, float))
 
 
 def extract_stat_functions(g, terms):
