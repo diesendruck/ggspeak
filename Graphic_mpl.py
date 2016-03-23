@@ -124,10 +124,17 @@ class Graphic(object):
 
                 # Make regular histogram, if no grouping.
                 if self.grouping is None:
-                    d[d_name].hist(alpha=0.5)
+                    pl = d[d_name].hist(alpha=0.5)
+                    pl.set_xlabel(d_name)
+                    pl.set_ylabel('Count')
+                    pl.set_title('Distribution of {}'.format(d_name))
                 # Make grouped histogram, if has grouping.
                 else:
-                    d[d_name].hist(by=d[self.grouping], alpha=0.5)
+                    pl_list = d[d_name].hist(by=d[self.grouping], alpha=0.5)
+                    pl_list = pl_list.ravel()
+                    for hist in range(len(pl_list)):
+                        pl_list[hist].set_xlabel(d_name)
+                        pl_list[hist].set_ylabel('Count')
 
             # Make a bar chart, if geom is bar or data is categorical.
             else:

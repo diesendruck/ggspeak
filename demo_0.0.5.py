@@ -13,6 +13,7 @@ import pandas as pd
 from copy import copy
 from Graphic_mpl import Graphic
 from jellyfish import levenshtein_distance as ld
+from nltk.corpus import stopwords as sw
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
 plt.ion()
@@ -95,21 +96,28 @@ def prepare_mic():
 
 
 def choose_dataset(g):
-    print 'Type file name.'
-    filename = os.getcwd()+'/'+raw_input('Filename: '+os.getcwd()+'/')
-    try:
-        dataset = pd.read_csv(filename)
-    except LookupError:
-        print("No document found.")
+    valid_file = False
+    while not valid_file:
+        try:
+            print 'Type file name.'
+            filename = os.getcwd()+'/'+raw_input('Filename: '+os.getcwd()+'/')
+            dataset = pd.read_csv(filename)
+            dataset.columns = [w.lower() for w in dataset.columns]
+            valid_file = True
 
-    # Set dataset as the chosen file.
-    g.dataset = dataset
-    g.filename = filename
+            # Set dataset as the chosen file.
+            g.dataset = dataset
+            g.filename = filename
 
-    names = '[' + ', '.join(list(g.dataset.columns.values)) + ']'
-    names = names.upper()
-    print('\nYou are using the dataset ' + g.filename)
-    data_preview(g)
+            names = '[' + ', '.join(list(g.dataset.columns.values)) + ']'
+            names = names.upper()
+            print('\nYou are using the dataset ' + g.filename)
+            data_preview(g)
+
+        except Exception, e:
+            print e
+            print("No document found.")
+
     return g
 
 
@@ -128,6 +136,7 @@ def tokenize(text):
     text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore')
     text = text.lower()
     terms = text.split(' ')
+    terms = [t for t in terms if t not in sw.words('english')]
     return terms
 
 
@@ -210,7 +219,8 @@ def extract_data_cols(g, terms):
     # Get first data cols.
     if not g.has_base():
         try:
-            g.data_cols = [t for t in terms if t in g.dataset.columns.values]
+            targets = g.dataset.columns.values
+            g.data_cols = [t for t in terms if t in targets]
             # Get fuzzy match for column names, respecting homophones.
             # g.data_cols = homophone_matches(terms, g.dataset.columns.values)
             print('Relevant variables: ' + str(g.data_cols))
@@ -220,7 +230,8 @@ def extract_data_cols(g, terms):
     # Already has base, so find grouping variables.
     else:
         try:
-            g.grouping = [t for t in terms if t in g.dataset.columns.values]
+            targets = g.dataset.columns.values
+            g.grouping = [t.lower() for t in terms if t in targets]
             # Take only last matching name.
             g.grouping = str(g.grouping[-1])
             # Get fuzzy match for column names, respecting homophones.
