@@ -7,7 +7,10 @@
 \usepackage{times}
 \usepackage{url}
 \usepackage{latexsym}
-\usepackage{datetime}
+\usepackage{enumerate}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
 
 %\setlength\titlebox{5cm}
 
@@ -21,26 +24,26 @@
 
 \author{Maurice Diesendruck \\
   Department of Statistics and Data Sciences\\
-  University of Texas\\
+  University of Texas \\
   Austin, TX \\
   {\tt momod@utexas.edu} 
   \\\And
   Honghe Zhao \\
   Department of Mathematics\\
-  University of Texas\\
+  University of Texas \\
   Austin, TX \\
   {\tt joehonghe@utexas.edu} \\
   }
 
-\date{February 16, 2016}
+\date{March 28, 2016}
 
 \begin{document}
 \maketitle
 \begin{abstract} 
   This research identifies techniques that enable a computer system to perform automated data 
-  visualization by actively "listening" to a user's natural spoken language, in an interactive 
-  and real-time session. This work coins the name \textit{ggspeak} as the "grammar of 
-  graphics" for speech, and presents a Python library that incorporates speech recognition and
+  visualization by actively ``listening" to a user's natural spoken language, in an interactive 
+  and real-time session. This work coins the name \textit{ggspeak} as the ``grammar of 
+  graphics" for speech, and presents software that incorporates speech recognition and
   a domain-specific entity extraction algorithm that respects and resolves errors of
   mistranscription.
 \end{abstract}
@@ -54,7 +57,8 @@ communicate with such devices.
 With computing becoming increasingly voice-driven, so too should applications and interfaces for data manipulation and visualization. Today, one can visualize data using (among other 
 things) Python's matplotlib, R's ggplot, or Microsoft's Excel; but these interfaces typically 
 require long work-flows of option selection and formatting, and can include cumbersome syntax. 
-To the best of the researcher's knowledge, there is no other publicly available system that targets a fluid, interactive, voice-driven data visualization interface.
+To the best of our knowledge, there is no other publicly available system that targets
+a fluid, interactive, voice-driven data visualization interface.
 
 The closest related works by Harada et al.~\shortcite{Harada:07}, and Levin and
 Lieberman~\shortcite{Levin:04}, utilize speech to produce animations and other art.
@@ -62,26 +66,119 @@ Lieberman~\shortcite{Levin:04}, utilize speech to produce animations and other a
 Project code for the system mentioned here is made available on the author's GitHub page at
 \url{https://github.com/diesendruck/ggspeak}.
 
+\section{Grammar of Graphics for Speech}
+The syntax and pacing of speech differs greatly from that of the written language (coded syntax being one example). When speaking, people pause, repeat words, allude to things implicitly, and carry context from one statement to the next. Any voice system used to produce graphics would ideally respect these natural qualities of speech, and eventually produce a correct, detailed, and explicit definition for a graph object.
+
+When using only their voice, users tend to build graphs iteratively, first defining a basic relationship, then proceeding to more complex features. For a given graph, users naturally swap features in and out, and find value in saving valuable visualizations for later use.
+
+Given this, voice commands in this domain can be interpreted as being decomposable into at least two classes: statements indicating session-level actions, and statements indicating graph-level actions. This system uses hotword detection to identify a variety of session-level actions, like Quit, Save, Reset, and Summarize, before processing graph-level details. Such a grouping enables a conversational approach, in which users build graphs over several steps.
+
+\subsection{Spoken Workflow}
+The phrases in Figure \ref{fig:conversation} represent a typical ``conversation" with a voice-driven graphing application. The data set is called \texttt{diamonds.csv} and the column names are ``carat", ``cut", ``color", ``clarity", ``depth", ``table", ``price", ``x", ``y", and ``z".
+
+\begin{figure}[ht]
+\includegraphics[width=0.48\textwidth]{conversation}
+\caption{A typical sequence of voice commands, when graphing data related to diamonds. Commands refer to both the session and the graph itself, and often come in fragments.}
+\label{fig:conversation}
+\end{figure}
+
+\vspace{1em}
+Several challenges emerge from such a simple example. What type of graph should be created at first? How do ``color by'' and ``group by'' commands respect the current state of the graph? What happens if ``x'' and ``y'', or any other variables, are not recognized? The following sections, as well as the accompanying software, provide a means of maintaining a fluid conversation, that adapts to mistranscriptions and user error.
+
+
 \section{Application}
+
 \subsection{Speech Recognition}
 The system utilizes the popular Python module SpeechRecognition~\cite{Zhang:16} to manage audio
-capture and transcription, and currently runs locally on the user's laptop.
+capture and transcription.
+\subsection{Type of Data}
+We aim to serve the large community of users who benefit from graph visualizations, but for whom coding and graphical user interface (GUI) software is an obstacle. For this reason, our system focuses first on tabular data, due to its intelligible structure and its ubiquity in the form of CSV files. The structure in labeled, tabular data conveniently translates into structured speech, where columns can be identified by name, for example.
+
+
+
 \subsection{Architecture}
-The user first selects a comma-separated values (CSV) file to be the data for the session. 
-The system then initializes a "Graphic" object, which will contain all relevant details for the 
-graph. At this point, the system begins to listen, and at each utterance, evaluates whether 
-words relating to graphical syntax are present. For example, did the words "scatterplot" or 
-"histogram" or "line graph" appear? Similarly, did the user say any names that match the CSV 
-column headers?
 
-Meanwhile, with each completed utterance, the system determines whether the user has asked to quit, and if not, whether the current graph details produce a valid graph. The interaction begins when the system produces a valid graph that can be further edited by the user in subsequent spoken commands.
+\subsubsection{Microphone}
+The system begins by preparing the microphone and recognizer objects, used to capture audio from the user's device.
 
-\subsection{Disambiguation and Mistranscription}
-While the scope of graphing vocabulary and syntax may seem small, it is difficult to 
-generalize the task of recognizing header names. Homophones, rhyming words, and non-English
-concatenations will typically be mistranscribed. Consider, for example, the headers "X", "Y", and "Under10". A user that says "plot X versus Y and group by Under10", may produce a transcription of "plot ex versus why and group by under ten".
+\subsubsection{Graphic Object}
+Next, an empty Graphic object is initialized in order to store relevant graph attributes. Each object has functions which:
+\begin{enumerate}[i]
+\item determine whether the graph is valid,
+\item determine if the graph has a basic relationship already in place,
+\item summarize the attributes of the graph,
+\item infer and display the current graph to the user.
+\end{enumerate}
+This fourth function serves as the workhorse function, and infers the appropriate geometry in cases where a user does not specific the graph type. It does this by evaluating the number and type of variables. 
 
-To resolve this, the researchers propose a fuzzy comparison or distance metric between phonetic encodings, e.g. distance between Soundex or Metaphone encodings.
+This fourth function also contains the bulk of the code that converts the object's attributes into the graphing syntax - the mission of the system as a whole. In our case, the system uses Python's matplotlib and Pandas packages, though this section could be written to be compatible for any graphic style.
+
+\subsubsection{Data Set Selection}
+The system then allows the user to choose a data set for use during that session, and displays the first five rows of the data set. Storing a copy at this point allows the user to reset the graph to its original state, and generate a new graphic from scratch.
+
+\subsubsection{Parsing and Understanding}
+With the microphone, data, and Graphic object infrastructure in place, the user can begin to iteratively manipulate the graphic object using voice commands.
+
+To do this, each voice command is formatted, filtered of stopwords and punctuation, and tokenized; and all subsequent information is extracted from those tokens. As described in Figure \ref{fig:flow}, the tokens are first evaluated in a hierarchical manner for session-level hotwords. For example, if any of the following tokens occur, the system displays a summary: ['summary', 'summarize', 'describe', 'description']. If no session-level function is activated, the system then extracts the geometry, data columns, and groupings based on the query tokens.
+
+\begin{figure}[ht]
+\includegraphics[width=0.47\textwidth]{flow}
+\caption{Voice commands can implicitly refer to the session or to the graph. Checking both levels allows the user to speak freely about either, and get the desired action. At the graph level, if the basic relationship exists, the user can iteratively update. Otherwise, a new graph is created and drawn.}
+\label{fig:flow}
+\end{figure}
+
+\section{Disambiguation and Mistranscription}
+While the scope of graphing vocabulary and its syntax may seem small, it is difficult to generalize the task of recognizing column names, especially when names can include partial words and symbols.
+
+Homophones, rhyming words, initialisms (e.g. GDP), single-letter names, and words with symbols like ``-" and ``\_", are extremely common in practice and are typically mistranscribed by current state-of-the-art speech recognition systems. This is likely because such systems are trained on conversational data, which uses mostly complete words, instead of word fragments. 
+
+To resolve these ambiguities, we explored phonetic encodings like the Metaphone algorithm~\cite{Phillips:90} and the Match Rating Codex~\cite{Moore:77}, and string comparisons like the Levenshtein distance~\cite{Levenshtein:66} and the Jaro distance~\cite{Jaro:89}. We have also composed phonetic and string matching methods to find a method of fuzzy matching that yields optimal performance.
+
+\begin{figure*}
+\includegraphics[width=\textwidth]{distances}
+\caption{Column names fall into many categories that pose challenges to entity disambiguation. Single-letter column names, one-word homophones, and two-word concatenations are some examples. For single-letter and one-word target names, green rows are examples of mistranscriptions that we believe a system should resolve, and red rows are cases we believe the system should not resolve. For all target types, the following distances are reported: Levenshtein on words, Levenshtein on the Metaphone encodings of words, Levenshtein on the Match Rating Codex of the words, and similarly for the Jaro distance.}
+\label{fig:distances}
+\end{figure*}
+
+\subsection{Examples}
+Consider the headers ``X", ``Y", and ``Under10". A user who says ``plot X versus Y and group by Under10", may produce a transcription of ``plot ex versus why and group by under ten". 
+
+Figure \ref{fig:distances} shows several examples of true or ``target" header names, sample mistranscriptions of those names, and distance measures between target names and their transcriptions. When distances are small, the system replaces "nearly-correct" transcriptions with their associated target values.
+
+Figure \ref{fig:distances} can be used to select a distance method and threshold that resolves a particular type of mistranscription. For example, in the green and red rows associated with the target ``x", the mistranscription ``ex" has a Levenshtein distance of 1, while the mistranscription ``lacks" has a Levenshtein distance of 5. This indicates that to resolve ``ex" but not ``lacks", the system could set a distance threshold of 2; then it would resolve cases where distances are less than 2, and not resolve cases where distances are greater than 2.
+
+For concatenated names, as seen in the bottom six sections of Figure \ref{fig:distances}, query tokens can be paired to produce bigrams, and distances between bigrams and targets can utilize the same distance thresholding technique described above.
+
+The order of these techniques matters, and we found that the following order produces the fewest errors of matching:
+\begin{enumerate}
+\item Exact match on single tokens.
+\item Exact match on bigrams.
+\item Fuzzy match using phonetically encoded bigrams.
+\item Fuzzy match using phonetically encoded single tokens.
+\end{enumerate}
+
+\section{Types of Graph Output}
+Currently supported graphs include histograms, grouped histograms, bar charts, grouped bar charts, scatter plots, and grouped scatter plots. Figure \ref{fig:plots} illustrates these graphs along with the voice commands that create them.
+
+Notably, the statements in Figure \ref{fig:plots} reflect the piece-wise conversation the user can have with the system. In the first case, the user says ``\textit{chart of color}", and immediately sees the graph in column 1. The user can evaluate the results, then follow up with ``\textit{group by cut}", at which point the system updates the graph in real-time. To keep conversation fluid and easy, the user can also freely mix and match numeric and categorical variables without explicitly defining a graph geometry (e.g. histogram, bar chart). To handle this, the system infers the appropriate graph based on the stated variable types.  For example, if the user says ``\textit{show price}'', the system recognizes the variable as numeric and chooses a histogram; similarly, if the user says ``\textit{show color}'', the system recognizes the variable as categorical and chooses a bar chart.
+
+\begin{figure*}
+\includegraphics[width=\textwidth]{plots}
+\caption{Plots are created using sequential commands, and can involve groupings by categorical or numerical variables. If no graph type is stated, the system infers the graph geometry based on variable types. For invalid graphs, the system indicates why and awaits another graph command.}
+\label{fig:plots}
+\end{figure*}
+
+\section{Future Work}
+We have shown a proof of concept of a graphing utility in Python that generates a variety of useful graphs using only a CSV file and natural speech as input. Our system also flexibly handles mistranscriptions, and presents several methods of creating fuzzy matches for different styles of column header syntax. The current system, while functional in its present form, certainly lacks common features, useful data summaries, and stable platform infrastructure. The following are a subset of possible improvements:
+\begin{itemize}
+\item FEATURES: Filter columns by value, Customize graph axes, labels, and title.
+\item TABLES: Pivot tables, Cross tables, Other frequency tables.
+\item PLATFORM: Availability in browser and on mobile.
+\item TECHNOLOGY: Enterprise-level automatic speech recognition (ASR)
+\item UNDERSTANDING: Large-corpus training for entity extraction and disambiguation.
+\end{itemize}
+
+To make this technology immediately usable by a large audience, a focused set of next steps could include setting up a web-service that processes speech in real-time through the browser, using a powerful API-based speech recognition system, e.g. Google's Cloud Speech API. A minimal front-end interface could be created to upload a file, allow the user to start a microphone, and display graphs. Such a setup would remain consistent with the core tenet of making visualization easy with only the most basic and familiar interfaces.
 
 % include your own bib file like this:
 %\bibliographystyle{acl}
@@ -102,12 +199,39 @@ Golan Levin and Zachary Lieberman.
 \newblock {\em Proceedings of The 3rd International Symposium on Non-Photorealistic Animation and Rendering}.
 \newblock Annecy, France.
 
+\bibitem[\protect\citename{{Moore}}1977]{Moore:77}
+{Gwendolyn~B. Moore, John~L. Kuhns, Jeffrey~L. Treffzs, and Christine~A. Montgomery}.
+\newblock 1977.
+\newblock {Accessing Individual Records from Personal Data Files Using Nonunique Identifiers}.
+\newblock {\em US National Institute of Standards and Technology. p. 17. NIST SP - 500-2}.
+
+
+\bibitem[\protect\citename{{Phillips}}1990]{Phillips:90}
+{Lawrence Phillips}.
+\newblock 1990.
+\newblock {Hanging on the Metaphone}.
+\newblock {\em Computer Language, Vol. 7, No. 12 (December)}.
+
+\bibitem[\protect\citename{{Jaro}}1989]{Jaro:89}
+{Matthew~A. Jaro}.
+\newblock 1989.
+\newblock {Advances in record-linkage methodology as
+applied to matching the 1985 census of Tampa, Florida}.
+\newblock {\em Journal
+of the American Statistical Association, 84:414–420}.
+
 \bibitem[\protect\citename{{Harada, Wobbrock, and Landay}}2007]{Harada:07}
 {Susumu Harada, Jacob~O. Wobbrock, and James~A. Landay}.
 \newblock 2007.
 \newblock {Voicedraw: a hands-free voice-driven drawing application for people with motor impairments}.
 \newblock {\em Proceedings of the 9th International ACM SIGACCESS Conference on Computers and Accessibility}.
 \newblock Tempe, Arizona, USA.
+
+\bibitem[\protect\citename{{Levenshtein}}1966]{Levenshtein:66}
+{Vladimir~I. Levenshtein}.
+\newblock 1966.
+\newblock {Binary codes capable of correcting deletions, insertions, and reversals}.
+\newblock {\em Soviet Physics Doklady 10 (8): 707-710}.
 
 \end{thebibliography}
 
