@@ -103,6 +103,7 @@ def choose_dataset(g):
             filename = os.getcwd()+'/'+raw_input('Filename: '+os.getcwd()+'/')
             dataset = pd.read_csv(filename)
             dataset.columns = [w.lower() for w in dataset.columns]
+            # TODO: normalize headers by removing spaces and punct.
             valid_file = True
 
             # Set dataset as the chosen file.
